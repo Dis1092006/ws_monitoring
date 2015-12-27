@@ -1,0 +1,43 @@
+<component name="libraryTable">
+  <library name="GOPATH &lt;ws_monitoring&gt;">
+    <CLASSES>
+      <root url="file://$PROJECT_DIR$/../balance_mos_ru_monitoring" />
+      <root url="file://$PROJECT_DIR$/../code.google.com" />
+      <root url="file://$PROJECT_DIR$/../WebTest" />
+      <root url="file://$PROJECT_DIR$/../Zeus" />
+      <root url="file://$PROJECT_DIR$/../IdeaTest" />
+      <root url="file://$PROJECT_DIR$/../Eclipse" />
+      <root url="file://$PROJECT_DIR$/../github.com" />
+      <root url="file://$PROJECT_DIR$/../9fans.net" />
+      <root url="file://$PROJECT_DIR$/../DisAdminConsol" />
+      <root url="file://$PROJECT_DIR$/../KomodoTest" />
+    </CLASSES>
+    <SOURCES />
+    <excluded>
+      <root url="file://$PROJECT_DIR$/../code.google.com/p/rog-go/exp/go/printer/testdata" />
+      <root url="file://$PROJECT_DIR$/../github.com/golang/appengine/.git" />
+      <root url="file://$PROJECT_DIR$/../github.com/nsf/gocode/_goremote" />
+      <root url="file://$PROJECT_DIR$/../github.com/rusmonster/signin/.git" />
+      <root url="file://$PROJECT_DIR$/../balance_mos_ru_monitoring/.idea" />
+      <root url="file://$PROJECT_DIR$/../github.com/nsf/gocode/_testing" />
+      <root url="file://$PROJECT_DIR$/../WebTest/.idea" />
+      <root url="file://$PROJECT_DIR$/../github.com/rusmonster/signin/.idea" />
+      <root url="file://$PROJECT_DIR$/../DisAdminConsol/.git" />
+      <root url="file://$PROJECT_DIR$/../balance_mos_ru_monitoring/.git" />
+      <root url="file://$PROJECT_DIR$/../IdeaTest/.idea" />
+      <root url="file://$PROJECT_DIR$/../Eclipse/.metadata" />
+      <root url="file://$PROJECT_DIR$/../DisAdminConsol/.idea" />
+      <root url="file://$PROJECT_DIR$/../KomodoTest/.komodotools" />
+      <root url="file://$PROJECT_DIR$/../github.com/denisenkom/go-mssqldb/.git" />
+      <root url="file://$PROJECT_DIR$/../github.com/nsf/gocode/.git" />
+      <root url="file://$PROJECT_DIR$/../code.google.com/p/gcfg/testdata" />
+      <root url="file://$PROJECT_DIR$/../code.google.com/p/rog-go/.hg" />
+      <root url="file://$PROJECT_DIR$/../code.google.com/p/gcfg/.git" />
+      <root url="file://$PROJECT_DIR$" />
+      <root url="file://$PROJECT_DIR$/../github.com/rusmonster/signin/.gradle" />
+      <root url="file://$PROJECT_DIR$/../9fans.net/go/.git" />
+      <root url="file://$PROJECT_DIR$/../github.com/rusmonster/.idea" />
+      <root url="file://$PROJECT_DIR$/../github.com/nsf/gocode/_gccgo" />
+    </excluded>
+  </library>
+</component>

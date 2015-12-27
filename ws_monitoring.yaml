@@ -1,0 +1,14 @@
+#Файл в формате YAML поэтому ОТСТУПЫ, ЗНАКИ ТИРЕ (-), ДВОЕТОЧИЯ очень важны
+#Для отступов НЕ ИСПОЛЬЗОВАТЬ ТАБУЛЯТОРЫ
+
+#Уровень отладки. Влияет на содержимое сообщений в логе
+#Допустимые значения: DEBUG INFO ERROR
+loglevel: DEBUG 
+
+max_check_threads: 4
+
+services:
+- address: https://golang.org/
+  enabled: true
+  check_interval: 60 # 1 минута
+
