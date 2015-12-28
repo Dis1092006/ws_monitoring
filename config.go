@@ -4,8 +4,8 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
-
 	"gopkg.in/yaml.v2"
+	"time"
 )
 
 var (
@@ -15,9 +15,11 @@ var (
 
 // Service - структура настроек для web-сервиса, который будет мониториться
 type Service struct {
-	Address			string		`yaml:"address"`
-	Enabled			bool		`yaml:"enabled"`
-	CheckInterval	int			`yaml:"check_interval"`
+	Address			string			`yaml:"address"`
+	Login			string			`yaml:"login"`
+	Password		string			`yaml:"password"`
+	Enabled			bool			`yaml:"enabled"`
+	CheckInterval	time.Duration	`yaml:"check_interval"`
 }
 
 // Config - структура для считывания конфигурационного файла

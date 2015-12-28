@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 const (
@@ -15,6 +15,9 @@ const (
 	//statfile       = "tmp/stat.json"
 )
 
+//----------------------------------------------------------------------------------------------------------------------
+// Основная функция программы
+//----------------------------------------------------------------------------------------------------------------------
 func main() {
 
 	// Загрузка конфигурации
@@ -42,48 +45,64 @@ func main() {
 	}
 }
 
+//----------------------------------------------------------------------------------------------------------------------
 // Вечный рабочий цикл
+//----------------------------------------------------------------------------------------------------------------------
 func workingLoop(cfg *Config) {
 	// Цикл по списку web-сервисов
 	for _, service := range cfg.Services {
 		if service.Enabled != true {
 			continue
 		}
-		go check(service.Address)
+		go checkWebService(service.Address, service.Login, service.Password, service.CheckInterval)
 	}
 }
 
-func checkWebService(url string) {
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+func checkWebService(url string, login string, password string, interval time.Duration) {
 	// Вечный цикл
 	for {
-		tm := time.Now().Format("2006–01–02 15:04:05")
+		tm1 := time.Now().Format("2006–01–02 15:04:05")
 		// статус, который возвращает check, пока не используем, поэтому ставим _
-		_, msg := check(url)
-		//log_to_file(tm, msg)
-		fmt.Println(tm, msg)
-		time.Sleep(1 * time.Minute)
+		fmt.Println(tm1, "Проверка подключения к адресу: ", url)
+		_, msg := check(url, login, password)
+		tm2 := time.Now().Format("2006–01–02 15:04:05")
+		log_to_file(tm2, msg)
+		fmt.Println(tm2, msg)
+		time.Sleep(interval * time.Second)
 	}
 }
 
-func check(url string) (bool, string) {
-	// возвращает true — если сервис доступен, false, если нет и текст сообщения
-	fmt.Println("Проверяем адрес ", url)
-	resp, err := http.Get(url)
+//----------------------------------------------------------------------------------------------------------------------
+// Проверка подключения к web-сервису
+// возвращает true — если сервис доступен, false, если нет и текст сообщения
+//----------------------------------------------------------------------------------------------------------------------
+func check(url string, login string, password string) (bool, string) {
 
+	// Попытка подключения
+	req, err := http.NewRequest("GET", url, nil)
+	req.SetBasicAuth(login, password)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	defer resp.Body.Close()
+
+	// Анализ результата попытки подключения
 	if err != nil {
 		return false, fmt.Sprintf("Ошибка соединения. % s", err)
 	}
-
-	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return false, fmt.Sprintf("Ошибка.http - статус: %s", resp.StatusCode)
 	}
 	return true, fmt.Sprintf("Онлайн. http-статус: %d", resp.StatusCode)
 }
 
+//----------------------------------------------------------------------------------------------------------------------
+// Запись в лог.
+//----------------------------------------------------------------------------------------------------------------------
 func log_to_file(tm, s string) {
 	// Сохраняет сообщения в файл
-	f, err := os.OpenFile("ws_monitoring.log", os.O_RDWR | os.O_APPEND | os.O_CREATE, 0644)
+	f, err := os.OpenFile("ws_monitoring.log", os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
 		fmt.Println(tm, err)
 		return

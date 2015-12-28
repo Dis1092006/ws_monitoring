@@ -8,7 +8,9 @@ loglevel: DEBUG
 max_check_threads: 4
 
 services:
-- address: https://golang.org/
-  enabled: true
-  check_interval: 60 # 1 минута
+- address: ***
+  login: ***
+  password: ***
+  enabled: true # false для блокировки
+  check_interval: 10 # в секундах
 
