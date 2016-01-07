@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http"
+	//"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,6 +14,14 @@ const (
 	configFileName = "ws_monitoring.yaml"
 	//statfile       = "tmp/stat.json"
 )
+
+type CheckResult struct {
+	CheckTime		string			`json:"time"`
+	CheckDuration	time.Duration	`json:"duration"`
+	Address			string  		`json:"address"`
+	StatusCode		int				`json:"status"`
+	Error       	string			`json:"error" binding:"required"`
+}
 
 //----------------------------------------------------------------------------------------------------------------------
 // Основная функция программы
@@ -59,17 +67,24 @@ func workingLoop(cfg *Config) {
 }
 
 //----------------------------------------------------------------------------------------------------------------------
+// Проверка работоспособности указанного web-сервиса и отправка результата в data collector
 //----------------------------------------------------------------------------------------------------------------------
 func checkWebService(url string, login string, password string, interval time.Duration) {
+
 	// Вечный цикл
 	for {
-		tm1 := time.Now().Format("2006–01–02 15:04:05")
-		// статус, который возвращает check, пока не используем, поэтому ставим _
-		fmt.Println(tm1, "Проверка подключения к адресу: ", url)
-		_, msg := check(url, login, password)
-		tm2 := time.Now().Format("2006–01–02 15:04:05")
-		log_to_file(tm2, msg)
-		fmt.Println(tm2, msg)
+		checkResult := check(url, login, password)
+
+		// Отправить результат проверки сборщику данных
+		dataCollectorURL := "http://10.126.200.4:3000/api/imd"
+		response, err := makeRequest("POST", dataCollectorURL, checkResult)
+		if err != nil {
+			fmt.Println("Ошибка отправки данных в data collector ", err)
+			//return respTodo, err
+		}
+		fmt.Println("Результат отправки данных в data collector ", response)
+		//err = processResponseEntity(response, &respTodo, 201)
+
 		time.Sleep(interval * time.Second)
 	}
 }
@@ -78,23 +93,38 @@ func checkWebService(url string, login string, password string, interval time.Du
 // Проверка подключения к web-сервису
 // возвращает true — если сервис доступен, false, если нет и текст сообщения
 //----------------------------------------------------------------------------------------------------------------------
-func check(url string, login string, password string) (bool, string) {
+func check(url string, login string, password string) (CheckResult) {
+	var checkResult CheckResult
+
+	//tm1 := time.Now().Format("2006–01–02 15:04:05")
+	checkTime := time.Now()
+	fmt.Println(checkTime.Format("2006–01–02 15:04:05"), "Проверка подключения к адресу: ", url)
 
 	// Попытка подключения
-	req, err := http.NewRequest("GET", url, nil)
-	req.SetBasicAuth(login, password)
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	defer resp.Body.Close()
+//	req, _ := http.NewRequest("GET", url, nil)
+//	req.SetBasicAuth(login, password)
+//	client := &http.Client{}
+//	resp, err := client.Do(req)
+	resp, err := makeRequest(url, login, password)
+	//statusCode := resp.StatusCode
+	//defer resp.Body.Close()
 
-	// Анализ результата попытки подключения
-	if err != nil {
-		return false, fmt.Sprintf("Ошибка соединения. % s", err)
+	checkDuration := time.Since(checkTime)
+//	log_to_file(checkTime.Add(checkDuration).Format("2006–01–02 15:04:05"), string(resp.StatusCode))
+//	fmt.Println(checkTime.Add(checkDuration).Format("2006–01–02 15:04:05"), string(resp.StatusCode))
+
+	// Заполнение результата проверки подключения
+	checkResult = CheckResult{
+		CheckTime: checkTime.Format("2009–01–01T00:00:00"),
+		CheckDuration: checkDuration,
+		Address: url,
+		StatusCode: resp.StatusCode,
+		Error: err.Error(),
 	}
-	if resp.StatusCode != 200 {
-		return false, fmt.Sprintf("Ошибка.http - статус: %s", resp.StatusCode)
-	}
-	return true, fmt.Sprintf("Онлайн. http-статус: %d", resp.StatusCode)
+
+	fmt.Printf("%+v\n", checkResult)
+
+	return checkResult
 }
 
 //----------------------------------------------------------------------------------------------------------------------
