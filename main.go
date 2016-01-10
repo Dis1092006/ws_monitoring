@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
-	//"net/http"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,11 +16,11 @@ const (
 )
 
 type CheckResult struct {
-	CheckTime		string			`json:"time"`
-	CheckDuration	time.Duration	`json:"duration"`
-	Address			string  		`json:"address"`
-	StatusCode		int				`json:"status"`
-	Error       	string			`json:"error" binding:"required"`
+	CheckTime     string        `json:"time"`
+	CheckDuration time.Duration `json:"duration"`
+	Address       string        `json:"address"`
+	StatusCode    int           `json:"status"`
+	Error         string        `json:"error"`
 }
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -35,7 +35,7 @@ func main() {
 			log.Fatalf("Не удалось загрузить %s: %s", configFileName, err)
 		}
 	}
-	log.Printf("%#v", cfg)
+	//	log.Printf("%#v", cfg)
 
 	// Запуск рабочего цикла
 	go workingLoop(cfg)
@@ -93,36 +93,40 @@ func checkWebService(url string, login string, password string, interval time.Du
 // Проверка подключения к web-сервису
 // возвращает true — если сервис доступен, false, если нет и текст сообщения
 //----------------------------------------------------------------------------------------------------------------------
-func check(url string, login string, password string) (CheckResult) {
-	var checkResult CheckResult
+func check(url string, login string, password string) *CheckResult {
+	// Подготовка результата работы функции проверки
+	var checkResult *CheckResult = new(CheckResult)
 
-	//tm1 := time.Now().Format("2006–01–02 15:04:05")
+	// Засечка времени
 	checkTime := time.Now()
-	fmt.Println(checkTime.Format("2006–01–02 15:04:05"), "Проверка подключения к адресу: ", url)
 
 	// Попытка подключения
-//	req, _ := http.NewRequest("GET", url, nil)
-//	req.SetBasicAuth(login, password)
-//	client := &http.Client{}
-//	resp, err := client.Do(req)
-	resp, err := makeRequest(url, login, password)
-	//statusCode := resp.StatusCode
-	//defer resp.Body.Close()
+	req, _ := http.NewRequest("GET", url, nil)
+	req.SetBasicAuth(login, password)
+	client := &http.Client{}
+	resp, err := client.Do(req)
 
+	// Контроль длительности замера
 	checkDuration := time.Since(checkTime)
-//	log_to_file(checkTime.Add(checkDuration).Format("2006–01–02 15:04:05"), string(resp.StatusCode))
-//	fmt.Println(checkTime.Add(checkDuration).Format("2006–01–02 15:04:05"), string(resp.StatusCode))
 
-	// Заполнение результата проверки подключения
-	checkResult = CheckResult{
-		CheckTime: checkTime.Format("2009–01–01T00:00:00"),
-		CheckDuration: checkDuration,
-		Address: url,
-		StatusCode: resp.StatusCode,
-		Error: err.Error(),
+	// Анализ результатов попытки подключения
+	fmt.Println(checkTime.Format("2006–01–02 15:04:05"), "Проверка подключения к адресу: ", url)
+	if err != nil {
+		checkResult.StatusCode = 0
+		checkResult.Error = err.Error()
+		fmt.Println("Ошибка!", err)
+	} else {
+		defer resp.Body.Close()
+		checkResult.StatusCode = resp.StatusCode
+		checkResult.Error = ""
+		fmt.Println("Успешно. Длительность запроса: ", checkDuration)
 	}
 
-	fmt.Printf("%+v\n", checkResult)
+	// Заполнение результата проверки подключения
+	checkResult.CheckTime = checkTime.Format("2006–01–02T15:04:05")
+	checkResult.CheckDuration = checkDuration
+	checkResult.Address = url
+//	fmt.Printf("%+v\n", checkResult)
 
 	return checkResult
 }

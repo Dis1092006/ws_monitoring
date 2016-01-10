@@ -12,15 +12,6 @@ import (
 
 var _ = log.Print
 
-func makeCheckGetRequest(url string, login string, password string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.SetBasicAuth(login, password)
-	return http.DefaultClient.Do(req)
-}
-
 func makeRequest(method string, url string, entity interface{}) (*http.Response, error) {
 	req, err := buildRequest(method, url, entity)
 	if err != nil {
