@@ -24,10 +24,10 @@ type Service struct {
 
 // Config - структура для считывания конфигурационного файла
 type Config struct {
-	LogLevel		string		`yaml:"loglevel"`
-	Services		[]Service	`yaml:"services"`
-	MaxCheckThreads	int			`yaml:"max_check_threads"`
-
+	ReloadConfigInterval	int			`yaml:"reload_config_interval"`
+	LogLevel				string		`yaml:"log_level"`
+	LogFilename				string		`yaml:"log_filename"`
+	Services				[]Service	`yaml:"services"`
 }
 
 func readConfig(ConfigName string) (x *Config, err error) {
@@ -45,9 +45,8 @@ func readConfig(ConfigName string) (x *Config, err error) {
 	return x, nil
 }
 
-//Проверяет время изменения конфигурационного файла
-//и перезагружает его если он изменился
-//Возвращает errNotModified если изменений нет
+// Проверяет время изменения конфигурационного файла и перезагружает его если он изменился
+// Возвращает errNotModified если изменений нет
 func reloadConfig(configName string) (cfg *Config, err error) {
 	info, err := os.Stat(configName)
 	if err != nil {

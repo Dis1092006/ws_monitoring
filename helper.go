@@ -6,11 +6,10 @@ import (
 	//"errors"
 	"io"
 	//"io/ioutil"
-	"log"
 	"net/http"
 )
 
-var _ = log.Print
+//var _ = log.Print
 
 func makeRequest(method string, url string, entity interface{}) (*http.Response, error) {
 	req, err := buildRequest(method, url, entity)

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -23,19 +21,36 @@ type CheckResult struct {
 	Error         string        `json:"error"`
 }
 
+var (
+	cfg            *Config
+	startTime      = time.Now().Round(time.Second)
+	//эти переменные заполняются линкером.
+	//чтобы их передать надо компилировать программу с ключами
+	//go build -ldflags "-X main.buildtime '2015-12-22' -X main.version 'v1.0'"
+	version   = "debug build"
+	buildtime = "n/a"
+)
+
 //----------------------------------------------------------------------------------------------------------------------
 // Основная функция программы
 //----------------------------------------------------------------------------------------------------------------------
 func main() {
+	var err error
 
 	// Загрузка конфигурации
-	cfg, err := reloadConfig(configFileName)
+	cfg, err = reloadConfig(configFileName)
 	if err != nil {
 		if err != errNotModified {
 			log.Fatalf("Не удалось загрузить %s: %s", configFileName, err)
 		}
 	}
-	//	log.Printf("%#v", cfg)
+	log.Debugf("%#v", cfg)
+
+	// Инициализация логгера
+	if err := initLogger(cfg); err != nil {
+		log.Fatalln(err)
+	}
+	log.Infof("Версия: %s. Собрано %s", version, buildtime)
 
 	// Запуск рабочего цикла
 	go workingLoop(cfg)
@@ -57,12 +72,30 @@ func main() {
 // Вечный рабочий цикл
 //----------------------------------------------------------------------------------------------------------------------
 func workingLoop(cfg *Config) {
-	// Цикл по списку web-сервисов
-	for _, service := range cfg.Services {
-		if service.Enabled != true {
-			continue
+	for {
+		// Цикл по списку web-сервисов
+		for _, service := range cfg.Services {
+			if service.Enabled != true {
+				continue
+			}
+			go checkWebService(service.Address, service.Login, service.Password, service.CheckInterval)
 		}
-		go checkWebService(service.Address, service.Login, service.Password, service.CheckInterval)
+		// Перезагрузка конфигурации
+		cfgTmp, err := reloadConfig(configFileName)
+		if err != nil {
+			if err != errNotModified {
+				log.Fatalf("Не удалось загрузить %s: %s", configFileName, err)
+			}
+		} else {
+			log.Infoln("Перезагружен конфигурационный файл")
+			if err := initLogger(cfgTmp); err != nil {
+				log.Errorln(err)
+			} else {
+				cfg = cfgTmp
+			}
+		}
+		// Пауза
+		time.Sleep(time.Duration(cfg.ReloadConfigInterval) * time.Second)
 	}
 }
 
@@ -79,11 +112,9 @@ func checkWebService(url string, login string, password string, interval time.Du
 		dataCollectorURL := "http://10.126.200.4:3000/api/imd"
 		response, err := makeRequest("POST", dataCollectorURL, checkResult)
 		if err != nil {
-			fmt.Println("Ошибка отправки данных в data collector ", err)
-			//return respTodo, err
+			log.Errorf("Ошибка отправки данных в data collector: %v", err)
 		}
-		fmt.Println("Результат отправки данных в data collector ", response)
-		//err = processResponseEntity(response, &respTodo, 201)
+		log.Debugf("Результат отправки данных в data collector: %+v", response)
 
 		time.Sleep(interval * time.Second)
 	}
@@ -110,39 +141,23 @@ func check(url string, login string, password string) *CheckResult {
 	checkDuration := time.Since(checkTime)
 
 	// Анализ результатов попытки подключения
-	fmt.Println(checkTime.Format("2006–01–02 15:04:05"), "Проверка подключения к адресу: ", url)
+	log.Infof("Проверка подключения к адресу: %s", url)
 	if err != nil {
 		checkResult.StatusCode = 0
 		checkResult.Error = err.Error()
-		fmt.Println("Ошибка!", err)
+		log.Errorf("Ошибка! %v", err)
 	} else {
 		defer resp.Body.Close()
 		checkResult.StatusCode = resp.StatusCode
 		checkResult.Error = ""
-		fmt.Println("Успешно. Длительность запроса: ", checkDuration)
+		log.Infof("Успешно. Длительность запроса: %d", checkDuration)
 	}
 
 	// Заполнение результата проверки подключения
 	checkResult.CheckTime = checkTime.Format("2006–01–02T15:04:05")
 	checkResult.CheckDuration = checkDuration
 	checkResult.Address = url
-//	fmt.Printf("%+v\n", checkResult)
+	log.Debugf("%+v", checkResult)
 
 	return checkResult
-}
-
-//----------------------------------------------------------------------------------------------------------------------
-// Запись в лог.
-//----------------------------------------------------------------------------------------------------------------------
-func log_to_file(tm, s string) {
-	// Сохраняет сообщения в файл
-	f, err := os.OpenFile("ws_monitoring.log", os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
-	if err != nil {
-		fmt.Println(tm, err)
-		return
-	}
-	defer f.Close()
-	if _, err = f.WriteString(fmt.Sprintln(tm, s)); err != nil {
-		fmt.Println(tm, err)
-	}
 }
