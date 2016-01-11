@@ -2,16 +2,16 @@ package main
 
 import (
 	"fmt"
+	"github.com/Sirupsen/logrus"
 	"os"
 	"strings"
 	"sync"
-	"github.com/Sirupsen/logrus"
 )
 
 var (
 	// Глобальная переменная для логгера
-	log = logrus.New()
-	initOnce	sync.Once
+	log      = logrus.New()
+	initOnce sync.Once
 )
 
 //----------------------------------------------------------------------------------------------------------------------

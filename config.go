@@ -2,32 +2,32 @@ package main
 
 import (
 	"errors"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
-	"gopkg.in/yaml.v2"
 	"time"
 )
 
 var (
-	configModTime int64
+	configModTime  int64
 	errNotModified = errors.New("Not modified")
 )
 
 // Service - структура настроек для web-сервиса, который будет мониториться
 type Service struct {
-	Address			string			`yaml:"address"`
-	Login			string			`yaml:"login"`
-	Password		string			`yaml:"password"`
-	Enabled			bool			`yaml:"enabled"`
-	CheckInterval	time.Duration	`yaml:"check_interval"`
+	Address       string        `yaml:"address"`
+	Login         string        `yaml:"login"`
+	Password      string        `yaml:"password"`
+	Enabled       bool          `yaml:"enabled"`
+	CheckInterval time.Duration `yaml:"check_interval"`
 }
 
 // Config - структура для считывания конфигурационного файла
 type Config struct {
-	ReloadConfigInterval	int			`yaml:"reload_config_interval"`
-	LogLevel				string		`yaml:"log_level"`
-	LogFilename				string		`yaml:"log_filename"`
-	Services				[]Service	`yaml:"services"`
+	ReloadConfigInterval int       `yaml:"reload_config_interval"`
+	LogLevel             string    `yaml:"log_level"`
+	LogFilename          string    `yaml:"log_filename"`
+	Services             []Service `yaml:"services"`
 }
 
 func readConfig(ConfigName string) (x *Config, err error) {
