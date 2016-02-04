@@ -78,19 +78,19 @@ func Shutdown() error {
 	var err error
 	defer CatchPanic(&err, "main", "workmanager.Shutdown")
 
-	log.Info("main", "workmanager.Shutdown", "Started")
+	log.Info("main, workmanager.Shutdown, Started")
 
 	// Shutdown the program
-	log.Info("main", "workmanager.Shutdown", "Info : Shutting Down")
+	log.Info("main, workmanager.Shutdown, Info : Shutting Down")
 	atomic.CompareAndSwapInt32(&wm.Shutdown, 0, 1)
 
-	log.Info("main", "workmanager.Shutdown", "Info : Shutting Down Work Timer")
+	log.Info("main, workmanager.Shutdown, Info : Shutting Down Work Timer")
 	wm.ShutdownChannel <- "Down"
 	<-wm.ShutdownChannel
 
 	close(wm.ShutdownChannel)
 
-	log.Info("main", "workmanager.Shutdown", "Completed")
+	log.Info("main, workmanager.Shutdown, Completed")
 	return err
 }
 
@@ -118,6 +118,9 @@ func (workManager *workManager) WorkingLoop(cfg *helper.Config) {
 	var workers WorkersList
 	log.Debugf("workingLoop, ожидание %d секунд", time.Duration(cfg.ReloadConfigInterval))
 
+	// Поток для контроля работоспособности рабочих потоков.
+	aliveWorkerChan = make(chan WorkerID)
+
 	// Первоначальная инициализация списка рабочих потоков
 	log.Debugf("len(cfg.Services) = %d", len(cfg.Services))
 	workers = make(WorkersList, len(cfg.Services))
@@ -132,17 +135,27 @@ func (workManager *workManager) WorkingLoop(cfg *helper.Config) {
 		go workManager.CheckWebService(workers[i].ID, workers[i].commandChan, aliveWorkerChan, service.Address, service.Login, service.Password, service.CheckInterval * time.Second)
 	}
 
-	// Поток для контроля работоспособности рабочих потоков.
-	aliveWorkerChan = make(chan WorkerID)
-
 	// Включение тикера
 	t := time.Tick(time.Duration(cfg.ReloadConfigInterval) * time.Second)
 
 	for {
-		log.Debugf("workingLoop, очередной цикл")
+		log.Debug("workingLoop, очередной цикл")
 		select {
+		case <-workManager.ShutdownChannel:
+			log.Info("workingLoop, закрытие рабочих потоков")
+			for i := 0; i < len(workers); i++ {
+				if workers[i].State {
+					workers[i].commandChan <- true
+					<-workers[i].commandChan
+					close(workers[i].commandChan)
+				}
+			}
+			log.Info("workingLoop, выключение контрольного потока")
+			workManager.ShutdownChannel <- "Down"
+			return
+
 		case <-t: // Срабатывание таймера.
-			log.Debugf("workingLoop, срабатывание таймера")
+			log.Debug("workingLoop, срабатывание таймера")
 			// Перезагрузка конфигурации
 			cfgTmp, err := helper.ReloadConfig(helper.ConfigFileName)
 			if err != nil {
@@ -203,7 +216,7 @@ func (workManager *workManager) WorkingLoop(cfg *helper.Config) {
 //----------------------------------------------------------------------------------------------------------------------
 func (workManager *workManager) CheckWebService(id WorkerID, innerChan chan Command, outerChan chan WorkerID, url string, login string, password string, interval time.Duration) {
 
-	log.Debugf("checkWebService, запущен рабочий поток: %d, интервал %d секунд", id, int(interval.Seconds()))
+	log.Debugf("checkWebService, запущен рабочий поток с номером: %d, интервал %d секунд", id, int(interval.Seconds()))
 
 	wait := interval
 
@@ -212,13 +225,9 @@ func (workManager *workManager) CheckWebService(id WorkerID, innerChan chan Comm
 		log.Debugf("checkWebService, ожидание %.3f секунд", wait.Seconds())
 
 		select {
-//		case <-workManager.ShutdownChannel:
-//			log.Info("checkWebService, выключение рабочего потока")
-//			workManager.ShutdownChannel <- "Down"
-//			return
-
 		case <-innerChan:
-			log.Info("checkWebService, выключение рабочего потока")
+			log.Infof("checkWebService, выключение рабочего потока с номером %d", id)
+			innerChan <- true
 			return
 
 		case <-time.After(wait):
@@ -241,7 +250,7 @@ func (workManager *workManager) CheckWebService(id WorkerID, innerChan chan Comm
 		log.Debugf("Результат отправки данных в data collector: %+v", response)
 
 		// Отправить контрольный сигнал
-		//		outerChan <- id
+		//outerChan <- id
 
 		// Mark the ending time
 		endTime := time.Now()
