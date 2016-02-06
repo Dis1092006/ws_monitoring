@@ -15,7 +15,6 @@ var (
 
 var (
 	cfg              *helper.Config
-	//processing      = newProcessingCache()
 	//startTime		= time.Now().Round(time.Second)
 
 	//эти переменные заполняются линкером.
