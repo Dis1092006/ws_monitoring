@@ -30,6 +30,7 @@ type Config struct {
 	ReloadConfigInterval int       `yaml:"reload_config_interval"`
 	LogLevel             string    `yaml:"log_level"`
 	LogFilename          string    `yaml:"log_filename"`
+	DataCollectorURL     string    `yaml:"data_collector_url"`
 	Services             []Service `yaml:"services"`
 }
 

@@ -8,7 +8,8 @@ import (
 	"time"
 	"ws_monitoring/helper"
 	"ws_monitoring/log"
-	//"github.com/Sirupsen/logrus"
+//"gopkg.in/fatih/pool.v2"
+//"net"
 )
 
 // Тип - идентификатор рабочего потока
@@ -27,6 +28,7 @@ type Worker struct {
 	Password      string
 	Interval      time.Duration
 	CommandChan   chan Command
+	Req           *http.Request
 }
 
 // Тип - cписок рабочих потоков
@@ -48,9 +50,10 @@ type CheckResult struct {
 }
 
 var (
-	wm               workManager // Reference to the singleton
+	wm workManager // Reference to the singleton
 	aliveWorkerChan  chan WorkerID
 	workerIDSequence WorkerID = 0
+//		chPool pool.Pool
 )
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -68,6 +71,16 @@ func Startup(cfg *helper.Config) error {
 		ShutdownChannel: make(chan string),
 	}
 
+	//// create a factory() to be used with channel based pool
+	//factory := func() (net.Conn, error) {
+	//		return net.Dial("tcp", cfg.DataCollectorURL)
+	//}
+	//
+	//// create a new channel based pool with an initial capacity of 5 and maximum
+	//// capacity of 30. The factory will create 5 initial connections and put it
+	//// into the pool.
+	//chPool, err = pool.NewChannelPool(5, 100, factory)
+
 	// Запуск рабочего цикла
 	go wm.WorkingLoop(cfg)
 
@@ -80,9 +93,11 @@ func Startup(cfg *helper.Config) error {
 //----------------------------------------------------------------------------------------------------------------------
 func Shutdown() error {
 	var err error
+	log.Info("workmanager.Shutdown, Started")
+
 	defer CatchPanic(&err, "main", "workmanager.Shutdown")
 
-	log.Info("workmanager.Shutdown, Started")
+	//defer chPool.Close()
 
 	// Shutdown the program
 	log.Info("workmanager.Shutdown, Info : Shutting Down")
@@ -131,7 +146,7 @@ func (workManager *workManager) WorkingLoop(cfg *helper.Config) {
 
 	// Запуск рабочих потоков
 	for i := 0; i < len(workManager.Workers); i++ {
-		go workManager.CheckWebService(workManager.Workers[i], aliveWorkerChan)
+		go workManager.CheckWebService(workManager.Workers[i], aliveWorkerChan, cfg.DataCollectorURL)
 	}
 
 	// Включение тикера
@@ -147,14 +162,15 @@ func (workManager *workManager) WorkingLoop(cfg *helper.Config) {
 			workManager.ShutdownChannel <- "Down"
 			return
 
-		case <-t: // Срабатывание таймера.
+		case <-t:
+		// Срабатывание таймера.
 			log.Debug("workingLoop, срабатывание таймера")
-			// Контроль необходимости закрытия.
+		// Контроль необходимости закрытия.
 			if workManager.Shutdown == 1 {
 				log.Debug("workingLoop, workManager.Shutdown == 1")
 				return
 			}
-			// Перезагрузка конфигурации
+		// Перезагрузка конфигурации
 			cfgTmp, err := helper.ReloadConfig(helper.ConfigFileName)
 			if err != nil {
 				if err != helper.ErrNotModified {
@@ -182,14 +198,14 @@ func (workManager *workManager) WorkingLoop(cfg *helper.Config) {
 				// Запуск рабочих потоков
 				for i := 0; i < len(workManager.Workers); i++ {
 					log.Debugf("workingLoop, запуск рабочего потока с номером %d", workManager.Workers[i].ID)
-					go workManager.CheckWebService(workManager.Workers[i], aliveWorkerChan)
+					go workManager.CheckWebService(workManager.Workers[i], aliveWorkerChan, cfg.DataCollectorURL)
 				}
 			}
 
 		// Контрольный сигнал от рабочего потока.
 		case workerID := <-aliveWorkerChan:
 			log.Debugf("Контрольный сигнал от рабочего потока: %+v", workerID)
-			// Обновить данные о рабочем потоке.
+		// Обновить данные о рабочем потоке.
 			for i := 0; i < len(workManager.Workers); i++ {
 				if workManager.Workers[i].ID == workerID {
 					// Сохранить время получения контрольного сигнала.
@@ -206,9 +222,9 @@ func (workManager *workManager) WorkingLoop(cfg *helper.Config) {
 func (workManager *workManager) InitWorkers(cfg *helper.Config) {
 	workManager.Workers = make(WorkersList, len(cfg.Services))
 	for i, service := range cfg.Services {
-//		if service.Enabled != true {
-//			continue
-//		}
+		//		if service.Enabled != true {
+		//			continue
+		//		}
 		workerIDSequence = workerIDSequence + 1
 		workManager.Workers[i] = new(Worker)
 		workManager.Workers[i].ID = workerIDSequence
@@ -218,6 +234,8 @@ func (workManager *workManager) InitWorkers(cfg *helper.Config) {
 		workManager.Workers[i].Password = service.Password
 		workManager.Workers[i].Interval = service.CheckInterval * time.Second
 		workManager.Workers[i].CommandChan = make(chan Command)
+		workManager.Workers[i].Req, _ = http.NewRequest("GET", workManager.Workers[i].URL, nil)
+		workManager.Workers[i].Req.SetBasicAuth(workManager.Workers[i].Login, workManager.Workers[i].Password)
 	}
 }
 
@@ -241,7 +259,7 @@ func (workManager *workManager) CloseWorkers() {
 //----------------------------------------------------------------------------------------------------------------------
 // Проверка работоспособности указанного web-сервиса и отправка результата в data collector
 //----------------------------------------------------------------------------------------------------------------------
-func (workManager *workManager) CheckWebService(worker *Worker, outerChan chan WorkerID) {
+func (workManager *workManager) CheckWebService(worker *Worker, outerChan chan WorkerID, dataCollectorURL string) {
 
 	if worker == nil {
 		log.Debug("worker == nil")
@@ -286,13 +304,15 @@ func (workManager *workManager) CheckWebService(worker *Worker, outerChan chan W
 		startTime := time.Now()
 
 		// Рабочая проверка
-		checkResult := check(worker.URL, worker.Login, worker.Password)
+		//checkResult := check(worker.URL, worker.Login, worker.Password)
+		checkResult := check(worker.URL, worker.Req)
 
 		// Отправить результат проверки сборщику данных
-		dataCollectorURL := "http://10.126.200.4:3000/api/imd"
 		response, err := makeRequest("POST", dataCollectorURL, checkResult)
 		if err != nil {
 			log.Errorf("checkWebService [%d], Ошибка отправки данных в data collector: %v", worker.ID, err)
+		} else {
+			defer response.Body.Close()
 		}
 		log.Debugf("checkWebService [%d], Результат отправки данных в data collector: %+v", worker.ID, response)
 
@@ -314,18 +334,31 @@ func (workManager *workManager) CheckWebService(worker *Worker, outerChan chan W
 // Проверка подключения к web-сервису
 // возвращает true — если сервис доступен, false, если нет и текст сообщения
 //----------------------------------------------------------------------------------------------------------------------
-func check(url string, login string, password string) *CheckResult {
+//func check(url string, login string, password string) *CheckResult {
+func check(url string, req *http.Request) *CheckResult {
 	// Подготовка результата работы функции проверки
 	var checkResult *CheckResult = new(CheckResult)
 
 	// Засечка времени
 	checkTime := time.Now()
 
+	//// now you can get a connection from the pool, if there is no connection
+	//// available it will create a new one via the factory function.
+	//conn, err := chPool.Get()
+	//if err != nil {
+	//		log.Errorf("Get error: %s", err)
+	//}
+
 	// Попытка подключения
-	req, _ := http.NewRequest("GET", url, nil)
-	req.SetBasicAuth(login, password)
+	//req, _ := http.NewRequest("GET", url, nil)
+	//req.SetBasicAuth(login, password)
 	client := &http.Client{}
 	resp, err := client.Do(req)
+
+	//// do something with conn and put it back to the pool by closing the connection
+	//// (this doesn't close the underlying connection instead it's putting it back
+	//// to the pool).
+	//conn.Close()
 
 	// Контроль длительности замера
 	checkDuration := time.Since(checkTime)
